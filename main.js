@@ -21,6 +21,7 @@
   tilesLayer.style.position = 'absolute';
   tilesLayer.style.inset = '0';
   tilesLayer.style.pointerEvents = 'none';
+  tilesLayer.style.zIndex = '2';
   gridBg.appendChild(tilesLayer);
 
   // ----- Estado -----
@@ -299,73 +300,83 @@
     return true;
   }
 
-  // ----- Animación de deslizamiento -----
-  function animateMoves(moves, onDone){
-    try {
-      if (!moves || moves.length === 0) { onDone?.(); return; }
-      isAnimating = true;
+// ----- Animación de deslizamiento -----
+function animateMoves(moves, onDone){
+  try {
+    if (!moves || moves.length === 0) { onDone?.(); return; }
+    isAnimating = true;
 
-      const rootRect = gridBg.getBoundingClientRect();
-      const getRect = (r,c) => {
-        const idx = r * SIZE + c;
-        const cell = gridCells[idx];
-        const rect = cell.getBoundingClientRect();
-        return { left: rect.left - rootRect.left, top: rect.top - rootRect.top, width: rect.width, height: rect.height };
+    const rootRect = gridBg.getBoundingClientRect();
+    const getRect = (r,c) => {
+      const idx = r * SIZE + c;
+      const cell = gridCells[idx];
+      const rect = cell.getBoundingClientRect();
+      return {
+        left: rect.left - rootRect.left,
+        top: rect.top - rootRect.top,
+        width: rect.width,
+        height: rect.height
       };
+    };
 
-      // Capa temporal para las "ghost tiles"
-      const layer = document.createElement('div');
-      layer.style.position = 'absolute';
-      layer.style.inset = '0';
-      layer.style.pointerEvents = 'none';
-      gridBg.appendChild(layer);
+    // Capa temporal para las "ghost tiles" (por encima de las fichas persistentes)
+    const layer = document.createElement('div');
+    layer.style.position = 'absolute';
+    layer.style.inset = '0';
+    layer.style.pointerEvents = 'none';
+    layer.style.zIndex = '3';
+    gridBg.appendChild(layer);
 
-      let remaining = 0;
-      const done = () => {
-        remaining--;
-        if (remaining === 0) {
-          // limpiar capa y finalizar
-          layer.remove();
-          setTimeout(() => { // colchón pequeño para no cortar la animación
-            isAnimating = false;
-            onDone?.();
-          }, 0);
-        }
-      };
+    let remaining = 0;
+    const done = () => {
+      remaining--;
+      if (remaining === 0) {
+        layer.remove();
+        setTimeout(() => { // colchón pequeño para no cortar la animación
+          isAnimating = false;
+          onDone?.();
+        }, 0);
+      }
+    };
 
-      // Creamos una ficha fantasma por cada origen (dos si fue merge)
-      moves.forEach(m => {
-        const sources = m.from2 ? [m.from, m.from2] : [m.from];
-        sources.forEach(src => {
-          const from = getRect(src[0], src[1]);
-          const to = getRect(m.to[0], m.to[1]);
-          const ghost = document.createElement('div');
-          const val = m.merged ? (m.value / 2) : m.value;
-          ghost.className = `tile tile--${val}`;
-          ghost.textContent = val;
-          ghost.style.position = 'absolute';
-          ghost.style.left = from.left + 'px';
-          ghost.style.top = from.top + 'px';
-          ghost.style.width = from.width + 'px';
-          ghost.style.height = from.height + 'px';
-          ghost.style.transition = `transform ${SLIDE_MS}ms ease`;
-          layer.appendChild(ghost);
+    // Creamos una ficha fantasma por cada origen (dos si fue merge)
+    moves.forEach(m => {
+      const sources = m.from2 ? [m.from, m.from2] : [m.from];
+      sources.forEach(src => {
+        const from = getRect(src[0], src[1]);
+        const to = getRect(m.to[0], m.to[1]);
 
-          // forzamos reflow y aplicamos translate
-          requestAnimationFrame(() => {
-            const dx = to.left - from.left;
-            const dy = to.top - from.top;
-            ghost.style.transform = `translate(${dx}px, ${dy}px)`;
-          });
+        const ghost = document.createElement('div');
+        const val = m.merged ? (m.value / 2) : m.value; // mostrar valor de origen en merges
+        ghost.className = `tile tile--${val} tile--ghost`;
+        ghost.textContent = val;
 
-          remaining++;
-          setTimeout(done, SLIDE_MS);
+        ghost.style.position = 'absolute';
+        ghost.style.left = from.left + 'px';
+        ghost.style.top = from.top + 'px';
+        ghost.style.width = from.width + 'px';
+        ghost.style.height = from.height + 'px';
+        ghost.style.willChange = 'transform';
+        ghost.style.transition = `transform ${SLIDE_MS}ms cubic-bezier(0.2, 0.7, 0.2, 1)`;
+        ghost.style.animation = 'none';
+
+        layer.appendChild(ghost);
+
+        // forzamos reflow y aplicamos translate (GPU)
+        requestAnimationFrame(() => {
+          const dx = to.left - from.left;
+          const dy = to.top - from.top;
+          ghost.style.transform = `translate3d(${dx}px, ${dy}px, 0)`;
         });
+
+        remaining++;
+        setTimeout(done, SLIDE_MS);
       });
-    } catch {
-      onDone?.();
-    }
+    });
+  } catch {
+    onDone?.();
   }
+}
 
   // ----- Render -----
   function update() {
