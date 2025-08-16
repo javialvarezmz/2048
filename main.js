@@ -11,6 +11,10 @@
   const overlayMsg = document.getElementById('overlay-message');
   const overlayRestart = document.getElementById('overlay-restart');
 
+  // Contenedor de celdas fijas para calcular posiciones
+  const gridBg = document.querySelector('#game-container .grid');
+  const gridCells = Array.from(gridBg.querySelectorAll('.cell'));
+
   // ----- Estado -----
   const SIZE = 4;
   const STORAGE_KEY = '2048:state';
@@ -18,6 +22,10 @@
 
   let state = createInitialState();
   let prevState = null; // para undo (un paso)
+
+  // Animación: bloqueo de input mientras desliza
+  let isAnimating = false;
+  const SLIDE_MS = 140; // duración del deslizamiento en ms
 
   function createInitialState() {
     return {
@@ -70,6 +78,7 @@
     spawnRandomTile();
     spawnRandomTile();
     update();
+    if (navigator.vibrate) try { navigator.vibrate(6); } catch {}
   }
 
   function restoreOrStart() {
@@ -112,7 +121,7 @@
   // Normalizamos todo el movimiento a "izquierda".
   // Para las otras direcciones, rotamos o espejamos y reutilizamos la misma lógica.
   function move(direction) {
-    if (state.over || state.won) return;
+    if (state.over || state.won || isAnimating) return;
 
     // Guardamos estado para UNDO
     prevState = {
@@ -123,22 +132,51 @@
       over: state.over,
     };
 
-    let grid = cloneGrid(state.grid);
+    // Orientamos la grilla según dirección (normalizamos a izquierda)
+    let oriented = cloneGrid(state.grid);
+    if (direction === 'up') oriented = rotateLeft(oriented);
+    if (direction === 'down') oriented = rotateRight(oriented);
+    if (direction === 'right') oriented = mirror(oriented);
 
-    if (direction === 'up') grid = rotateLeft(grid);
-    if (direction === 'down') grid = rotateRight(grid);
-    if (direction === 'right') grid = mirror(grid);
+    const { newGrid, scoreGained, moved, moves } = moveLeftMergeWithMoves(oriented);
 
-    const { newGrid, scoreGained, moved } = moveLeftMerge(grid);
-
+    // Volvemos a des-orientar
     let resultGrid = newGrid;
-    if (direction === 'up') resultGrid = rotateRight(newGrid);
-    if (direction === 'down') resultGrid = rotateLeft(newGrid);
-    if (direction === 'right') resultGrid = mirror(newGrid);
+    let backMoves = moves.map(m => ({ from: m.from.slice(), from2: m.from2 ? m.from2.slice() : null, to: m.to.slice(), value: m.value, merged: m.merged }));
+
+    if (direction === 'up') {
+      resultGrid = rotateRight(newGrid);
+      backMoves = backMoves.map(m => ({
+        from: rotRight(m.from),
+        from2: m.from2 ? rotRight(m.from2) : null,
+        to: rotRight(m.to),
+        value: m.value,
+        merged: m.merged,
+      }));
+    }
+    if (direction === 'down') {
+      resultGrid = rotateLeft(newGrid);
+      backMoves = backMoves.map(m => ({
+        from: rotLeft(m.from),
+        from2: m.from2 ? rotLeft(m.from2) : null,
+        to: rotLeft(m.to),
+        value: m.value,
+        merged: m.merged,
+      }));
+    }
+    if (direction === 'right') {
+      resultGrid = mirror(newGrid);
+      backMoves = backMoves.map(m => ({
+        from: mir(m.from),
+        from2: m.from2 ? mir(m.from2) : null,
+        to: mir(m.to),
+        value: m.value,
+        merged: m.merged,
+      }));
+    }
 
     if (!moved) {
       state.moved = false;
-      // No hubo cambios: no spawneamos ni actualizamos score
       return;
     }
 
@@ -146,52 +184,61 @@
     state.score += scoreGained;
     if (state.score > state.best) state.best = state.score;
 
-    // Spawn de nueva ficha
+    // Spawn tras movimiento (en el estado ya actualizado)
     spawnRandomTile();
 
-    // Chequear estado de juego
+    // Flags de juego
     state.won = state.won || has2048(state.grid);
     state.over = isGameOver(state.grid);
-
     state.moved = true;
 
-    update();
+    // Animar y luego actualizar DOM (render)
+    animateMoves(backMoves, () => {
+      if (navigator.vibrate) try { navigator.vibrate(8); } catch {}
+      update();
+    });
   }
 
-  // Empuja/merge a la izquierda
-  function moveLeftMerge(grid) {
+  // Empuja/merge a la izquierda con moves para animación
+  function moveLeftMergeWithMoves(grid) {
     let moved = false;
     let scoreGained = 0;
     const out = grid.map(row => row.slice());
+    const moves = [];
 
     for (let r = 0; r < SIZE; r++) {
       const row = out[r].slice();
 
-      // 1) comprimir (quitar ceros)
-      const compressed = row.filter(v => v !== 0);
+      // Construimos lista comprimida con posiciones originales
+      const items = [];
+      for (let c = 0; c < SIZE; c++) if (row[c] !== 0) items.push({ c, v: row[c] });
 
-      // 2) fusionar adyacentes iguales (una vez)
-      const merged = [];
-      for (let i = 0; i < compressed.length; i++) {
-        if (i < compressed.length - 1 && compressed[i] === compressed[i + 1]) {
-          const val = compressed[i] * 2;
-          merged.push(val);
+      const mergedRow = [];
+      let writeC = 0;
+      for (let i = 0; i < items.length; i++) {
+        const cur = items[i];
+        if (i < items.length - 1 && cur.v === items[i + 1].v) {
+          // Fusión: dos elementos van a writeC
+          const val = cur.v * 2;
+          mergedRow.push(val);
           scoreGained += val;
-          i++; // saltar el siguiente (fusionado)
+          moves.push({ from: [r, cur.c], from2: [r, items[i + 1].c], to: [r, writeC], value: val, merged: true });
+          i++; // saltamos el siguiente
         } else {
-          merged.push(compressed[i]);
+          // Desplazamiento simple
+          mergedRow.push(cur.v);
+          moves.push({ from: [r, cur.c], from2: null, to: [r, writeC], value: cur.v, merged: false });
         }
+        writeC++;
       }
 
-      // 3) rellenar con ceros a la derecha
-      while (merged.length < SIZE) merged.push(0);
+      while (mergedRow.length < SIZE) mergedRow.push(0);
 
-      // ¿cambió la fila?
-      if (!arraysEqual(row, merged)) moved = true;
-      out[r] = merged;
+      if (!arraysEqual(row, mergedRow)) moved = true;
+      out[r] = mergedRow;
     }
 
-    return { newGrid: out, scoreGained, moved };
+    return { newGrid: out, scoreGained, moved, moves };
   }
 
   function arraysEqual(a, b) {
@@ -217,6 +264,11 @@
     return res;
   }
 
+  // Mapas de coordenadas inversos para animación
+  function mir(coord){ return [coord[0], SIZE - coord[1] - 1]; }
+  function rotLeft(coord){ return [SIZE - coord[1] - 1, coord[0]]; }
+  function rotRight(coord){ return [coord[1], SIZE - coord[0] - 1]; }
+
   // Comprobaciones
   function has2048(g) {
     for (let r = 0; r < SIZE; r++) for (let c = 0; c < SIZE; c++) if (g[r][c] === 2048) return true;
@@ -233,10 +285,77 @@
       if (d === 'up') temp = rotateLeft(temp);
       if (d === 'down') temp = rotateRight(temp);
       if (d === 'right') temp = mirror(temp);
-      const { moved } = moveLeftMerge(temp);
+      const { moved } = moveLeftMergeWithMoves(temp);
       if (moved) return false;
     }
     return true;
+  }
+
+  // ----- Animación de deslizamiento -----
+  function animateMoves(moves, onDone){
+    try {
+      if (!moves || moves.length === 0) { onDone?.(); return; }
+      isAnimating = true;
+
+      const rootRect = tileContainer.getBoundingClientRect();
+      const getRect = (r,c) => {
+        const idx = r * SIZE + c;
+        const cell = gridCells[idx];
+        const rect = cell.getBoundingClientRect();
+        return { left: rect.left - rootRect.left, top: rect.top - rootRect.top, width: rect.width, height: rect.height };
+      };
+
+      // Capa temporal para las "ghost tiles"
+      const layer = document.createElement('div');
+      layer.style.position = 'absolute';
+      layer.style.inset = '0';
+      layer.style.pointerEvents = 'none';
+      tileContainer.appendChild(layer);
+
+      let remaining = 0;
+      const done = () => {
+        remaining--;
+        if (remaining === 0) {
+          // limpiar capa y finalizar
+          layer.remove();
+          setTimeout(() => { // colchón pequeño para no cortar la animación
+            isAnimating = false;
+            onDone?.();
+          }, 0);
+        }
+      };
+
+      // Creamos una ficha fantasma por cada origen (dos si fue merge)
+      moves.forEach(m => {
+        const sources = m.from2 ? [m.from, m.from2] : [m.from];
+        sources.forEach(src => {
+          const from = getRect(src[0], src[1]);
+          const to = getRect(m.to[0], m.to[1]);
+          const ghost = document.createElement('div');
+          ghost.className = `tile tile--${m.merged ? m.value : m.value}`;
+          ghost.textContent = m.merged ? (m.value/ (sources.length === 2 ? 1 : 1)) : m.value;
+          ghost.style.position = 'absolute';
+          ghost.style.left = from.left + 'px';
+          ghost.style.top = from.top + 'px';
+          ghost.style.width = from.width + 'px';
+          ghost.style.height = from.height + 'px';
+          ghost.style.transition = `transform ${SLIDE_MS}ms ease`;
+          layer.appendChild(ghost);
+
+          // forzamos reflow y aplicamos translate
+          requestAnimationFrame(() => {
+            const dx = to.left - from.left;
+            const dy = to.top - from.top;
+            ghost.style.transform = `translate(${dx}px, ${dy}px)`;
+          });
+
+          remaining++;
+          setTimeout(done, SLIDE_MS);
+        });
+      });
+    } catch {
+      onDone?.();
+    }
   }
 
   // ----- Render -----
@@ -293,6 +412,7 @@
 
   // ----- Inputs (teclado) -----
   window.addEventListener('keydown', (e) => {
+    if (isAnimating) return;
     if (e.key === 'ArrowLeft')  { e.preventDefault(); move('left'); }
     if (e.key === 'ArrowRight') { e.preventDefault(); move('right'); }
     if (e.key === 'ArrowUp')    { e.preventDefault(); move('up'); }
@@ -307,6 +427,7 @@
 
     tileContainer.addEventListener('touchstart', (e) => {
       if (!e.touches || e.touches.length !== 1) return;
+      if (isAnimating) return;
       const t = e.touches[0];
       startX = t.clientX; startY = t.clientY;
       tracking = true;
@@ -318,6 +439,7 @@
     }, { passive: false });
 
     tileContainer.addEventListener('touchend', (e) => {
+      if (isAnimating) return;
       if (!tracking) return;
       tracking = false;
       const t = e.changedTouches[0];

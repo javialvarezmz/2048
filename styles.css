@@ -1,3 +1,30 @@
+:root{
+  --bg: #faf8ef;
+  --bg-contrast: #f9f6f2;
+  --text: #776e65;
+  --muted: #8f7a66;
+  --board: #bbada0;
+  --cell: #cdc1b4;
+  --btn: #8f7a66;
+  --btn-hover: #7a6857;
+  --shadow: 0 6px 16px rgba(0,0,0,.08), 0 2px 6px rgba(0,0,0,.06);
+  --radius: 12px;
+  --gap: 12px;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --bg: #101010;
+    --bg-contrast: #1a1a1a;
+    --text: #eae6df;
+    --muted: #c9bfae;
+    --board: #2a2a2a;
+    --cell: #3a3a3a;
+    --btn: #c9bfae;
+    --btn-hover: #b2a995;
+    --shadow: 0 10px 30px rgba(0,0,0,.45), 0 2px 10px rgba(0,0,0,.35);
+  }
+}
+
 /* -------- Reset & base -------- */
 *,
 *::before,
@@ -7,8 +34,10 @@ html, body {
   height: 100%;
   margin: 0;
   font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
-  background: #faf8ef; /* clásico del 2048 */
-  color: #776e65;
+  background: var(--bg);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 body {
@@ -16,21 +45,23 @@ body {
   flex-direction: column;
   align-items: center;
   padding: 24px 12px;
+  gap: 8px;
 }
 
 /* -------- Header -------- */
 header {
-  width: min(520px, 92vw);
+  width: min(560px, 92vw);
   display: flex;
-  align-items: baseline;
+  align-items: flex-end;
   justify-content: space-between;
-  gap: 12px;
+  gap: 16px;
   margin-bottom: 16px;
 }
 
 h1 {
-  font-size: clamp(28px, 6vw, 48px);
+  font-size: clamp(32px, 6.2vw, 52px);
   margin: 0;
+  letter-spacing: 1px;
 }
 
 #scoreboard {
@@ -39,18 +70,19 @@ h1 {
 }
 
 .score-box {
-  background: #bbada0;
+  background: var(--muted);
   color: #fff;
-  padding: 8px 12px;
-  border-radius: 8px;
-  font-weight: 700;
-  min-width: 110px;
+  padding: 10px 14px;
+  border-radius: var(--radius);
+  font-weight: 800;
+  min-width: 120px;
   text-align: center;
+  box-shadow: var(--shadow);
 }
 
 /* -------- Layout principal -------- */
 main {
-  width: min(520px, 92vw);
+  width: min(560px, 92vw);
 }
 
 /* Contenedor general del juego */
@@ -60,6 +92,7 @@ main {
   aspect-ratio: 1 / 1; /* cuadrado */
   user-select: none;
   touch-action: none;
+  filter: drop-shadow(0 10px 18px rgba(0,0,0,.12));
 }
 
 /* Rejilla de fondo (celdas) */
@@ -68,25 +101,26 @@ main {
   inset: 0;
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  padding: 12px;
-  background: #bbada0;
-  border-radius: 10px;
+  gap: var(--gap);
+  padding: var(--gap);
+  background: var(--board);
+  border-radius: var(--radius);
+  box-shadow: inset 0 3px 0 rgba(255,255,255,.08), inset 0 -3px 0 rgba(0,0,0,.06);
 }
 
 .cell {
-  background: #cdc1b4;
-  border-radius: 6px;
+  background: linear-gradient(180deg, color-mix(in oklab, var(--cell) 96%, white 4%), var(--cell));
+  border-radius: calc(var(--radius) * 0.55);
 }
 
 /* Contenedor de fichas dinámicas */
 #tile-container {
   position: absolute;
   inset: 0;
-  padding: 12px;
+  padding: var(--gap);
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
+  gap: var(--gap);
 }
 
 /* -------- Fichas -------- */
@@ -94,13 +128,15 @@ main {
   position: relative;
   width: 100%;
   aspect-ratio: 1 / 1;
-  border-radius: 6px;
+  border-radius: calc(var(--radius) * 0.55);
   display: grid;
   place-items: center;
-  font-weight: 800;
+  font-weight: 900;
   font-size: clamp(18px, 5vw, 32px);
   transform: scale(1);
   animation: tile-pop 120ms ease-out;
+  box-shadow: 0 2px 0 rgba(0,0,0,.08), 0 6px 12px rgba(0,0,0,.08);
+  text-shadow: 0 1px 0 rgba(0,0,0,.08);
 }
 
 /* Color por valor (clásicos 2048) */
@@ -116,6 +152,9 @@ main {
 .tile--1024 { background: #edc53f; color: #f9f6f2; font-size: clamp(14px, 3.6vw, 24px); }
 .tile--2048 { background: #edc22e; color: #f9f6f2; font-size: clamp(14px, 3.6vw, 24px); }
 
+.tile { border: 1px solid rgba(0,0,0,.04); }
+.tile--1024, .tile--2048 { letter-spacing: .5px; }
+
 /* Aparición y fusión */
 @keyframes tile-pop {
   from { transform: scale(0.7); opacity: 0; }
@@ -124,7 +163,7 @@ main {
 
 @keyframes tile-merge {
   0%   { transform: scale(1); }
-  35%  { transform: scale(1.12); }
+  35%  { transform: scale(1.1); }
   100% { transform: scale(1); }
 }
 
@@ -135,25 +174,26 @@ main {
 /* -------- Controles -------- */
 #controls {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   justify-content: center;
-  margin: 14px 0 6px;
+  margin: 16px 0 8px;
 }
 
 button {
   border: none;
-  background: #8f7a66;
+  background: var(--btn);
   color: #fff;
   padding: 10px 14px;
-  border-radius: 8px;
+  border-radius: var(--radius);
   cursor: pointer;
-  font-weight: 700;
-  transition: filter .15s ease, transform .05s ease;
+  font-weight: 800;
+  transition: transform .06s ease, filter .15s ease, box-shadow .15s ease;
+  box-shadow: var(--shadow);
 }
-
-button:hover { filter: brightness(1.05); }
+button:hover { filter: brightness(1.06); }
 button:active { transform: translateY(1px); }
-button:disabled { opacity: .5; cursor: not-allowed; }
+button:disabled { opacity: .55; cursor: not-allowed; filter: grayscale(.1); box-shadow: none; }
+button:focus-visible { outline: 3px solid #58a6ff; outline-offset: 2px; }
 
 /* -------- Overlay (Win / Game Over) -------- */
 #overlay[hidden] { display: none; }
@@ -171,33 +211,34 @@ button:disabled { opacity: .5; cursor: not-allowed; }
   content: "";
   position: absolute;
   inset: 0;
-  background: rgba(238, 228, 218, 0.75);
-  backdrop-filter: blur(2px);
+  background: rgba(238, 228, 218, 0.82);
+  backdrop-filter: blur(3px);
   border-radius: 10px;
 }
 
 #overlay-message {
   position: relative;
   z-index: 1;
-  background: #f9f6f2;
-  color: #776e65;
-  padding: 18px 20px;
-  border-radius: 10px;
+  background: var(--bg-contrast);
+  color: var(--text);
+  padding: 20px 22px;
+  border-radius: var(--radius);
   font-size: 1.2rem;
-  margin-bottom: 10px;
-  box-shadow: 0 6px 16px rgba(0,0,0,.08);
+  margin-bottom: 12px;
+  box-shadow: var(--shadow);
 }
 
 #overlay-restart {
   position: relative;
   z-index: 1;
 }
+#overlay-restart:hover { filter: brightness(1.06); }
 
 /* -------- Footer -------- */
 footer {
   margin-top: 10px;
   font-size: .9rem;
-  color: #8f7a66;
+  color: var(--muted);
   text-align: center;
 }
 
