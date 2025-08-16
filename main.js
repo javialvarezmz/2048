@@ -3,6 +3,7 @@
 (() => {
   // ----- DOM -----
   const tileContainer = document.getElementById('tile-container');
+  tileContainer.style.pointerEvents = 'none';
   const scoreEl = document.getElementById('score');
   const bestEl = document.getElementById('best');
   const newGameBtn = document.getElementById('new-game-btn');
@@ -14,6 +15,13 @@
   // Contenedor de celdas fijas para calcular posiciones
   const gridBg = document.querySelector('#game-container .grid');
   const gridCells = Array.from(gridBg.querySelectorAll('.cell'));
+  const gameContainer = document.getElementById('game-container');
+  // Capa persistente para las fichas posicionadas por coordenadas absolutas (evita desajustes por subpíxel)
+  const tilesLayer = document.createElement('div');
+  tilesLayer.style.position = 'absolute';
+  tilesLayer.style.inset = '0';
+  tilesLayer.style.pointerEvents = 'none';
+  gridBg.appendChild(tilesLayer);
 
   // ----- Estado -----
   const SIZE = 4;
@@ -373,20 +381,40 @@
   }
 
   function renderGrid() {
-    // Limpia contenedor
-    tileContainer.innerHTML = '';
+    // Limpiamos la capa de fichas absoluta
+    tilesLayer.innerHTML = '';
+
+    // Medimos una vez el rect del grid y helper por celda
+    const rootRect = gridBg.getBoundingClientRect();
+    const getRect = (r, c) => {
+      const idx = r * SIZE + c;
+      const cell = gridCells[idx];
+      const rect = cell.getBoundingClientRect();
+      return {
+        left: rect.left - rootRect.left,
+        top: rect.top - rootRect.top,
+        width: rect.width,
+        height: rect.height
+      };
+    };
+
     for (let r = 0; r < SIZE; r++) {
       for (let c = 0; c < SIZE; c++) {
         const v = state.grid[r][c];
         if (v === 0) continue;
+
+        const rect = getRect(r, c);
         const tile = document.createElement('div');
         tile.className = `tile tile--${v} ${wasMergedLastMove(r, c) ? 'tile--merged' : ''}`;
-        tile.style.gridColumn = String(c + 1);
-        tile.style.gridRow = String(r + 1);
+        tile.style.position = 'absolute';
+        tile.style.left = rect.left + 'px';
+        tile.style.top = rect.top + 'px';
+        tile.style.width = rect.width + 'px';
+        tile.style.height = rect.height + 'px';
         tile.textContent = v;
         tile.setAttribute('role', 'gridcell');
         tile.setAttribute('aria-label', String(v));
-        tileContainer.appendChild(tile);
+        tilesLayer.appendChild(tile);
       }
     }
   }
@@ -426,7 +454,7 @@
   (() => {
     let startX = 0, startY = 0, tracking = false;
 
-    tileContainer.addEventListener('touchstart', (e) => {
+    gameContainer.addEventListener('touchstart', (e) => {
       if (!e.touches || e.touches.length !== 1) return;
       if (isAnimating) return;
       const t = e.touches[0];
@@ -434,12 +462,12 @@
       tracking = true;
     }, { passive: true });
 
-    tileContainer.addEventListener('touchmove', (e) => {
+    gameContainer.addEventListener('touchmove', (e) => {
       // evitar el scroll dentro del tablero
       if (tracking) e.preventDefault();
     }, { passive: false });
 
-    tileContainer.addEventListener('touchend', (e) => {
+    gameContainer.addEventListener('touchend', (e) => {
       if (isAnimating) return;
       if (!tracking) return;
       tracking = false;
