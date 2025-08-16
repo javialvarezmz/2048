@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>2048 Game</title>
+  <meta name="description" content="Juego 2048 en JavaScript: combina números hasta alcanzar el 2048." />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header>
+    <h1>2048</h1>
+    <div id="scoreboard">
+      <div class="score-box">Puntos: <span id="score">0</span></div>
+      <div class="score-box">Mejor: <span id="best">0</span></div>
+    </div>
+  </header>
+
+  <main>
+    <!-- Tablero -->
+    <div id="game-container" role="grid" aria-label="Tablero 2048">
+      <!-- Celdas de fondo (vacías) -->
+      <div class="grid">
+        <!-- 16 celdas fijas para el layout -->
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+        <div class="cell" role="gridcell"></div>
+      </div>
+      <!-- Contenedor dinámico de fichas -->
+      <div id="tile-container"></div>
+    </div>
+
+    <!-- Controles -->
+    <section id="controls">
+      <button id="new-game-btn" type="button">🔄 Nueva partida</button>
+      <button id="undo-btn" type="button">↩️ Deshacer</button>
+    </section>
+
+    <!-- Overlay -->
+    <div id="overlay" hidden>
+      <div id="overlay-message"></div>
+      <button id="overlay-restart" type="button">Jugar de nuevo</button>
+    </div>
+  </main>
+
+  <footer>
+    <p>Hecho con ❤️ para practicar JavaScript</p>
+  </footer>
+
+  <script src="main.js" defer></script>
+</body>
+</html>
