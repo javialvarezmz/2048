@@ -297,7 +297,7 @@
       if (!moves || moves.length === 0) { onDone?.(); return; }
       isAnimating = true;
 
-      const rootRect = tileContainer.getBoundingClientRect();
+      const rootRect = gridBg.getBoundingClientRect();
       const getRect = (r,c) => {
         const idx = r * SIZE + c;
         const cell = gridCells[idx];
@@ -310,7 +310,7 @@
       layer.style.position = 'absolute';
       layer.style.inset = '0';
       layer.style.pointerEvents = 'none';
-      tileContainer.appendChild(layer);
+      gridBg.appendChild(layer);
 
       let remaining = 0;
       const done = () => {
@@ -332,8 +332,9 @@
           const from = getRect(src[0], src[1]);
           const to = getRect(m.to[0], m.to[1]);
           const ghost = document.createElement('div');
-          ghost.className = `tile tile--${m.merged ? m.value : m.value}`;
-          ghost.textContent = m.merged ? (m.value/ (sources.length === 2 ? 1 : 1)) : m.value;
+          const val = m.merged ? (m.value / 2) : m.value;
+          ghost.className = `tile tile--${val}`;
+          ghost.textContent = val;
           ghost.style.position = 'absolute';
           ghost.style.left = from.left + 'px';
           ghost.style.top = from.top + 'px';
